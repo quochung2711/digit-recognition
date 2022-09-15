@@ -1,0 +1,132 @@
+---
+title: "Prososal"
+author: "Nhom 4"
+date: "7/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Thành viên nhóm
+
+19133025 Đinh Quốc Hùng
+
+19133010 Trần Nguyên Thái Bảo
+
+19133049 Đoàn Nhất Sinh
+
+19133023 Lê Tuấn Hiệp
+
+Tên đề tài :
+
+Nhận diện chữ số (Digit recognition)
+
+## **Phần 1 : Giới thiệu**
+
+Nhận dạng chữ số viết tay là khả năng máy tính nhận dạng chữ số viết tay của con người. Đó là một nhiệm vụ khó khăn cho cỗ máy vì các chữ số viết tay không hoàn hảo và có thể được tạo ra với nhiều kiểu cách khác nhau. Nhận dạng chữ số viết tay là giải pháp cho vấn đề này sử dụng hình ảnh của một chữ số và nhận dạng chữ số hiện diện trong hình ảnh.
+
+## **Phần 2 : Dữ liệu**
+
+Tập dữ liệu được lấy từ: <https://www.kaggle.com/competitions/digit-recognizer/data>
+
+Các tệp dữ liệu train.csv và test.csv chứa hình ảnh thang màu xám của các chữ số vẽ tay, từ 0 đến 9.
+
+Mỗi hình ảnh có chiều cao 28 pixel và chiều rộng 28 pixel, tổng cộng là 784 pixel. Mỗi pixel có một giá trị pixel duy nhất được liên kết với nó, cho biết độ sáng hoặc tối của pixel đó, với các con số cao hơn có nghĩa là tối hơn. Giá trị pixel này là một số nguyên từ 0 đến 255, bao gồm cả.
+
+Tập train.csv có 785 cột. Trong đó cột đầu tiên là nhãn và phần còn lại của các cột chứa các giá trị pixel của hình ảnh được liên kết.
+
+Đây là 10 dòng đầu tập train
+
+```{r echo=FALSE, fig.height=10, fig.width=10}
+train <-read.csv("C:\\MainProgramLearning\\Data Mining\\Project\\data\\train.csv")
+head(train ,10 ,10)
+
+```
+
+Mỗi cột pixel trong tập train có tên như pixelx, trong đó x là số nguyên từ 0 đến 783, bao gồm cả. Để xác định vị trí pixel này trên hình ảnh, giả sử rằng chúng ta đã phân tách x thành x = i \* 28 + j, trong đó i và j là các số nguyên từ 0 đến 27, bao gồm cả. Khi đó pixelx nằm trên hàng i và cột j của ma trận 28 x 28, (lập chỉ mục bằng 0).
+
+7 dòng đầu tập test
+
+```{r echo=FALSE}
+test <-read.csv("C:\\MainProgramLearning\\Data Mining\\Project\\data\\test.csv")
+head(test , 7)
+```
+
+Ví dụ: pixel31 cho biết pixel nằm trong cột thứ tư từ bên trái và hàng thứ hai từ trên cùng, như trong biểu đồ bên dưới.
+
+![](C:/Users/nguoi/AppData/Local/RStudio/tmp/paste-8D1A94EF.png)
+
+Kích thước của tập train và test.
+
+```{r echo=FALSE}
+dim(train) ; dim(test)
+```
+
+Đổi kiểu dữ liệu labe thành factor.
+
+```{r echo=FALSE}
+train[, 1] <- as.factor(train$label)
+head(sapply(train[1,], class))
+
+
+```
+
+Có 42000 quan sát với 784 tính năng. Tuy nhiên, một số cột chứa 0 cho tất cả các quan sát hoặc chúng có phương sai gần bằng không. Các cột này cần được xóa:
+
+```{r echo=FALSE}
+train_orig <- train
+test_orig <- test
+library(caret) 
+nzv.data <- nearZeroVar(train, saveMetrics = TRUE)
+drop.cols <- rownames(nzv.data)[nzv.data$nzv == TRUE]
+train <- train[,!names(train) %in% drop.cols]
+test <- test[,!names(test) %in% drop.cols]
+```
+
+Trực quán hóa dữ liệu
+
+```{r echo=FALSE}
+library(RColorBrewer)
+BNW <- c("white", "black")
+CUSTOM_BNW <- colorRampPalette(colors = BNW)
+
+par(mfrow = c(4, 3), pty = "s", mar = c(1, 1, 1, 1), xaxt = "n", yaxt = "n")
+
+images_digits_0_9 <- array(dim = c(10, 28 * 28))
+
+for (digit in 0:9) {
+  images_digits_0_9[digit + 1, ] <- apply(train_orig[train_orig[, 1] == digit, -1], 2, sum)
+  images_digits_0_9[digit + 1, ] <- images_digits_0_9[digit + 1, ]/max(images_digits_0_9[digit + 1, ]) * 255
+  z <- array(images_digits_0_9[digit + 1, ], dim = c(28, 28))
+  z <- z[, 28:1]
+  image(1:28, 1:28, z, main = digit, col = CUSTOM_BNW(256))
+}
+
+```
+
+Dựa vào kết quả trực quan trên ta thấy các số khá mờ nên rất dễ dẫn đến việc dữ đoán sai đối với mỗi số.
+
+Kiểm tra phần trăm các nhãn trong tập train
+
+```{r echo=FALSE}
+CUSTOM_BNW_PLOT <- colorRampPalette(brewer.pal(10, "Set3"))
+LabTable <- table(train_orig$label)
+par(mfrow = c(1, 1))
+percentage <- round(LabTable/sum(LabTable) * 100)
+labels <- paste0(row.names(LabTable), " (", percentage, "%) ")
+pie(LabTable, labels = labels, col = CUSTOM_BNW_PLOT(10), main = "Percentage of Digits (Training Set)")
+```
+
+Mỗi số đều có 10% trong tập dữ liệu.
+
+## **Phần 3 : Kế hoạch đối với đề tài.**
+
+**Mục tiêu của đề tài:** đối với từng record trên tập test thì ta cần phải đoán đúng nhãn của nó là gì.
+
+-   Sử dụng các thuật toán phân loại để xác định nhãn.
+
+-   Sử dụng các thuật toán phân loại và đánh giá các thuật toán. Các thuật toán nhóm dự kiến sử dụng: K-nn, decision tree, random forest
+
+\

@@ -1,0 +1,305 @@
+---
+title: "TestProject"
+author: "Nhom4"
+date: '2022-05-20'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## train data
+```{r}
+```
+
+
+```{r}
+head(train)
+```
+
+### thư viện cần
+```{r}
+library(caret)
+```
+```{r}
+library(doMC)
+library(kknn)
+
+```
+```{r}
+table(train$label)
+a <- as.factor(train$label)
+
+```
+```{r}
+digittrain <- data.frame(train,a)
+```
+```{r}
+digittrain.N <- digittrain[,-1]
+```
+```{r}
+digittrain.N
+```
+```{r}
+
+m <- dim(digittrain.N)[1]
+ids <- sample(1:m, size = round(m/3), replace = FALSE, 
+              prob = rep(1/m, m))
+trainSet <- digittrain.N[-ids, ]
+testSet <- digittrain.N[ids, ]
+```
+
+
+
+
+
+
+```{r}
+confusion_matrix <- function(predicted, actual) {
+  return(table(predicted, actual))
+}
+
+accuracy <- function(cm) {
+  return(sum(diag(cm))/sum(cm))
+}
+```
+#mô hình knn
+```{r}
+
+            knnmodel <- kknn(a ~ ., trainSet, testSet, k = 28, 
+            distance = 2, kernel = "rectangular")
+            knnmodel
+
+```
+```{r}
+nrow(trainSet)
+nrow(testSet)
+```
+
+
+
+
+#confusion matrix
+```{r}
+knnmodel.fit <- fitted(knnmodel)
+a<-table(testSet$a, knnmodel.fit)
+a
+```
+
+
+```{r}
+accuracy(a)
+```
+```{r}
+n <- sum(a)
+nc = nrow(a)
+diag = diag(a)
+rowsums = apply(a, 1, sum)
+colsums = apply(a, 2, sum)
+p = rowsums/n
+q = colsums/n
+acc <- sum(diag)/n
+acc
+```
+```{r}
+precision <- diag/colsums
+recall <- diag/ rowsums
+f1 = 2* precision*recall / (precision+recall)
+```
+```{r}
+data.frame(precision,recall,f1)
+```
+```{r}
+  macroPrecision = mean(precision)
+  macroRecall = mean(recall)
+  macroF1 = mean(f1)
+  data.frame(macroPrecision, macroRecall, macroF1)
+
+```
+
+
+
+
+
+```{r}
+set.seed(4200)
+nfolds <- 5 # số fold
+ids <- 1:nrow(digittrain.N)
+index <- sample(ids) # xao tron ngau nhien ids
+fold <- rep(1:nfolds, each = nrow(digittrain.N)/nfolds)
+folds <- split(index, fold) # tao mot danh sach voi cac index cho moi fold
+ks <- seq(1, 19, 2) # k = 1, 3, 5, ..., 19
+accs <- matrix(0, nrow = length(ks), ncol = nfolds + 1)
+#table(trainset[folds[[i]], ]$label)
+
+for (k in 1:length(ks)) {
+  s = 0
+  for (i in 1:nfolds) {
+    t <- kknn(a ~ ., 
+              train = digittrain.N[-folds[[i]], ], 
+              test = digittrain.N[folds[[i]], ], 
+              k = k, 
+              distance = 2, 
+              kernel = "rectangular")
+    cm <- confusion_matrix(fitted(t), digittrain.N[folds[[i]], 785])
+    a <- accuracy(cm)
+    s = s + a
+    accs[k, i] = a
+  }
+  accs[k, nfolds + 1] = s / nfolds
+}
+rownames(accs) <- paste ("k = ", ks, sep = "")
+colnames(accs) <- c(paste("fold ", 1:nfolds, sep = ""), "average")
+accs
+```
+```{r}
+cm
+accuracy(cm)
+```
+```{r}
+n1 <- sum(cm)
+nc1 = nrow(cm)
+diag1 = diag(cm)
+rowsums1 = apply(cm, 1, sum)
+colsums1 = apply(cm, 2, sum)
+p1 = rowsums1/n1
+q1= colsums1/n1
+acc1 <- sum(diag1)/n1
+acc1
+```
+##F1-Score
+```{r}
+
+precision1 <- diag1/colsums1
+recall1 <- diag1/ rowsums1
+f1.1 = 2* precision1*recall1 / (precision1+recall1)
+```
+```{r}
+data.frame(precision1,recall1,f1.1)
+```
+```{r}
+  macroPrecision1 = mean(precision1)
+  macroRecall1 = mean(recall1)
+  macroF11 = mean(f1.1)
+  data.frame(macroPrecision1, macroRecall1, macroF11)
+
+```
+
+
+
+
+```{r}
+library(ggplot2)
+data <- data.frame(k = ks, r = as.numeric(accs[, nfolds + 1]))
+ggplot(data = data, mapping = aes(x = k, y = r)) + 
+  theme_light() +
+  ggtitle("Average accuracy by k-fold cross validation") +
+  xlab("k") + 
+  ylab("Accuracy") +
+  geom_point(colour = "red", size = 4, shape = 21, fill = "white") + 
+  geom_line(colour = "red", linetype = "dashed", fill = "white")
+```
+
+```{r}
+# Helper packages
+library(dplyr)       # for data wrangling
+library(ggplot2)     # for awesome plotting
+library(doParallel)  # for parallel backend to foreach
+library(foreach)     # for parallel processing with for loops
+
+# Modeling packages
+library(caret)       # for general model fitting
+library(rpart)       # for fitting decision trees
+library(ipred)
+```
+
+
+
+
+```{r}
+ctrl<-trainControl(method="LOOCV",number=5)
+set.seed(233)
+mk1<-train(a~.,data=trainSet,method="knn",trControl = ctrl,metric="Accuracy")
+preb <- predict(mk1, testSet)
+cf<-confusionMatrix(preb, testSet$a)
+```
+```{r}
+cf<-confusion_matrix(preb, testSet$a)
+cf
+```
+
+## Đánh với LOOCV
+```{r}
+n2 <- sum(cf)
+nc2 = nrow(cf)
+diag2 = diag(cf)
+rowsums2 = apply(cf, 1, sum)
+colsums2 = apply(cf, 2, sum)
+p2 = rowsums2/n2
+q2= colsums2/n2
+acc2 <- sum(diag2)/n2
+acc2
+```
+### Tinh F1
+```{r}
+
+precision2 <- diag2/colsums2
+recall2 <- diag2/ rowsums2
+f1.2 = 2* precision2*recall2 / (precision2+recall2)
+```
+```{r}
+data.frame(precision2,recall2,f1.2)
+```
+## F marco
+```{r}
+  macroPrecision2 = mean(precision2)
+  macroRecall2 = mean(recall2)
+  macroF12 = mean(f1.2)
+  data.frame(macroPrecision2, macroRecall2, macroF12)
+
+```
+```{r}
+library(rpart)
+
+```
+
+```{r}
+
+model<- rpart(a ~ ., method = "class", data = trainSet)
+
+```
+
+```{r}
+model$variable.importance
+```
+```{r}
+library(rpart.plot)
+
+rpart.plot(model,trace=-1)
+
+plot(model, uniform = TRUE, main = "Classification Tree for Handwritten Digit Recognition ")
+text(model, all = TRUE, cex = 0.8)
+```
+```{r}
+pre <- predict(model, testSet, type="class")
+confusionMatrix(pre, testSet$a)
+```
+```{r}
+head(testSet$a.,5)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,61 @@
+---
+title: "Project"
+author: "Nhom"
+date: '2022-05-20'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#thư viện
+```{r}
+
+
+# load the library
+ 
+# package to perform data manipulation
+# and visualization
+library(tidyverse)
+ 
+# package to compute
+# cross - validation methods
+library(caret)
+ 
+ 
+# loading package to
+# import desired dataset
+library(ISLR)
+```
+
+Train data
+```{r}
+traindata <-read.csv("C:\\MainProgramLearning\\Data Mining\\Project\\data\\train.csv")
+head(traindata ,10 ,10)
+```
+test data
+```{r}
+testdata <-read.csv("C:\\MainProgramLearning\\Data Mining\\Project\\data\\test.csv")
+head(testdata , 7)
+```
+#thuật toán KNN
+```{r}
+trainctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+model <- train(label~., data = traindata, trControl=trainctrl, method="knn")
+```
+```{r}
+library(doMC)
+
+```
+
+#5-fold cross validation
+```{r}
+registerDoMC(cores = 3)
+ctrl <- trainControl(method="repeatedcv",repeats = 1, number = 4, verboseIter = T, allowParallel = T)
+knnFit <- train(label ~ ., data = training, method = "knn", trControl = ctrl)
+```
+```{r}
+
+```
+
+

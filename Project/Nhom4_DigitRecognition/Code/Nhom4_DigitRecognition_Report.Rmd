@@ -1,0 +1,317 @@
+---
+title: "Digit Recognizion"
+author: "Nhom4"
+date: '2022-05-29'
+output: html_document
+---
+
+```{r}
+path <- "C:\\MainProgramLearning\\Data Mining\\Project\\data"
+```
+```{r}
+setwd(path)
+```
+```{r}
+library(data.table)
+library(readr)
+library(caret)
+```
+Các thư viện sử dụng
+```{r}
+library(dplyr)       # for data wrangling
+library(ggplot2)     # for awesome plotting
+library(doParallel)  # for parallel backend to foreach
+library(foreach)     # for parallel processing with for loops
+library(randomForest)
+# Modeling packages
+library(caret)       # for general model fitting
+library(rpart)       # for fitting decision trees
+library(ipred)
+```
+Các tập dự liệu.
+```{r}
+train_orig  <- read_csv("train.csv")
+test_orig  <-read_csv("testdata.csv")
+train_model <- read_csv("digittrain.csv")
+```
+
+
+
+
+## chiaa tập dữ liệu
+```{r}
+# save the training labels
+train_orig_labels <- train_orig[, 1]
+train_orig_labels <- as.factor(train_orig$label)
+summary(train_orig_labels)
+```
+```{r}
+digittrainNew <- data.frame(train_orig,train_orig_labels)
+
+```
+# loại bỏ cột đầu tiê
+```{r}
+digittrain.N1 <- digittrainNew[,-1]
+
+```
+```{r}
+digittrain.N1
+```
+
+```{r}
+table(train_model$label)
+labelnew <- as.factor(train_model$label)
+```
+
+```{r}
+digittrain <- data.frame(train_model,labelnew)
+
+```
+# loại bỏ cột đầu tiê
+```{r}
+digittrain.N <- digittrain[,-1]
+
+```
+```{r}
+digittrain.N
+```
+## Chia dữ liệu 7 cho train và 3 cho validating
+```{r}
+m <- dim(digittrain.N)[1]
+ids <- sample(1:m, size = round(m/3), replace = FALSE, 
+              prob = rep(1/m, m))
+trainSet <- digittrain.N[-ids, ]
+testSet <- digittrain.N[ids, ]
+```
+
+## thuật toán k nn
+```{r}
+## k= 28
+library(caret)
+startTime <- proc.time()
+knnmodel <- knn3(labelnew  ~ ., trainSet, k= 28)
+proc.time()-startTime
+```
+```{r}
+startTime <- proc.time()
+test_error <- predict(knnmodel, testSet, type = "class")
+proc.time()-startTime
+
+```
+```{r}
+dg_results = confusionMatrix(table(predicted = test_error, 
+                                   actual = testSet$labelnew), 
+                             positive = "Yes")
+```
+```{r}
+dg_results$table
+```
+
+```{r}
+dg_results$overall["Accuracy"]
+```
+```{r}
+## chọn k = 27
+startTime <- proc.time()
+knnmodel1 <- knn3(labelnew  ~ ., trainSet, k= 27)
+test_error1 <- predict(knnmodel, testSet, type = "class")
+dg_results1 = confusionMatrix(table(predicted = test_error1, 
+                                   actual = testSet$labelnew), 
+                             positive = "Yes")
+dg_results1$overall["Accuracy"]
+
+proc.time()-startTime
+```
+```{r}
+## k =26
+startTime <- proc.time()
+knnmodel2 <- knn3(labelnew  ~ ., trainSet, k= 26)
+test_error2 <- predict(knnmodel, testSet, type = "class")
+dg_results2 = confusionMatrix(table(predicted = test_error2, 
+                                   actual = testSet$labelnew), 
+                             positive = "Yes")
+dg_results2$overall["Accuracy"]
+
+proc.time()-startTime
+```
+```{r}
+calc_class_err = function(actual, predicted) {
+  mean(actual != predicted)
+}
+```
+
+Dự đoán trên tập test.csv.
+```{r}
+library(FNN)
+```
+```{r}
+startTime <- proc.time()
+## dự đoán trên tập test
+knnmodelnew <- knn(train_orig[,-785], test_orig, train_orig_labels, k=27)
+proc.time()-startTime
+```
+```{r}
+require("gmodels")
+library("gmodels")
+
+```
+Xuất kết ra thành file csv submit kết quả lên cuộc thi.
+```{r}
+predictions <- data.frame(ImageId=1:nrow(test_orig), 
+                          Label=levels(train_orig_labels)[knnmodelnew])
+library(readr)
+write_csv(predictions, "knnpredictqh2.csv") 
+```
+Thuật toán Random Forest
+- Confusion Matrix
+```{r}
+confusion_matrix <- function(predicted, actual) {
+  return(table(predicted, actual))
+}
+
+```
+
+Thực hiện
+```{r}
+startTime <- proc.time()
+rfModelTrain <- randomForest(trainSet[,-785],trainSet[,785], ntree=150,mtry = 28)
+proc.time() - startTime
+
+```
+```{r}
+rfModelTrain
+
+```
+
+
+```{r}
+n <- sum(rfModelTrain$confusion)
+nc = nrow(rfModelTrain$confusion)
+diag = diag(rfModelTrain$confusion)
+rowsums = apply(rfModelTrain$confusion, 1, sum)
+colsums = apply(rfModelTrain$confusion, 2, sum)
+p = rowsums/n
+q = colsums/n
+acc <- sum(diag)/n
+acc
+```
+
+```{r}
+pre <- predict(rfModelTrain, testSet, type="class")
+confM <- confusionMatrix(pre, testSet$labelnew)
+confM
+```
+
+##Thực hiện dự đoán trên tập test
+
+
+```{r}
+numTrees <- 500
+# Train on entire training dataset and predict on the test
+startTime <- proc.time()
+rf <- randomForest(train_orig[,-1], train_orig_labels, xtest=test_orig, mtry = 28,
+                   ntree=numTrees)
+proc.time() - startTime
+
+```
+
+##Biểu đồ thể hiện tỷ lệ lỗi của các nhãn qua từng cây
+```{r}
+plot(rf, 
+     main = "RF Learning curve")
+
+```
+
+## TỶ lệ lỗi của từng nhãn
+```{r}
+err_df <- as.data.frame(rf$err.rate)
+err_df %>%
+  select(-"OOB") %>%
+  colMeans() 
+```   
+   
+   => Ta thấy nhãn 0 và 1 có tỷ lệ lỗi thấp nhất do đó đây là 2 nhãn dễ dự đoán nhất, còn nhãn khó dự đoán nhất là 8 và 9
+
+##Kết quả dự đoán trên tập test mà kaggle đưa ra
+```{r}
+predictions <- data.frame(ImageId=1:nrow(test_orig), 
+                          Label=levels(train_orig_labels)[rf$test$predicted])
+```
+
+## Xuất kết quả ra file csv để tiến hành submit
+```{r}
+write_csv(predictions, "rf_thaibao.csv")
+```
+
+Mô hình Decision tree
+```{r}
+## Sử dụng knn với tập 10%
+model<- rpart(labelnew ~ ., method = "class", data = trainSet)
+```
+Ma trân nhầm lãn
+```{r}
+pre <- predict(model, testSet, type="class")
+confusionMatrix(pre, testSet$labelnew)
+```
+```{r}
+library(rpart.plot)
+
+rpart.plot(model,trace=-1)
+
+plot(model, uniform = TRUE, main = "Classification Tree for Handwritten Digit Recognition ",)
+text(model, all = TRUE, cex = 1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
